@@ -209,13 +209,26 @@ describe('Windows server prebuild cache inputs', () => {
     )
   })
 
-  it.each([
-    'pnpm-lock.yaml',
-    'src/shared/node-runtime-pin.ts',
-    'config/patches/node-pty@1.1.0.patch',
-    'config/scripts/orcad-prebuild-slot-contents.mjs',
-    'config/scripts/node-pty-job-ownership.cjs'
-  ])('invalidates a changed %s input', (file) => {
+  it('covers the bundled compiler-spawn implementation', () => {
+    expect(WINDOWS_PREBUILD_CACHE_INPUTS).toEqual(
+      expect.arrayContaining(
+        [
+          'run-process',
+          'spawn-resolution',
+          'process-tree-termination',
+          'process-tree-kill-gate',
+          'spawn-observer',
+          'bounded-output-sink',
+          'child-termination-reporter',
+          'process-spec',
+          'windows-command-line',
+          'windows-cmd-shim-resolution'
+        ].map((name) => `src/shared/child-process/${name}.ts`)
+      )
+    )
+  })
+
+  it.each(WINDOWS_PREBUILD_CACHE_INPUTS)('invalidates a changed %s input', (file) => {
     const repository = mkdtempSync(join(tmpdir(), 'orca-prebuild-key-'))
     temporary.push(repository)
     const source = resolve(import.meta.dirname, '../..')

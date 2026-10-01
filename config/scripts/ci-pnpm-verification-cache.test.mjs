@@ -16,11 +16,24 @@ const evaluate = (expression, context) =>
   )
 
 describe('pnpm-owned verification record', () => {
-  it.each(['Linux', 'Windows', 'macOS'])('%s restores with the same explicit opt-out', (os) => {
+  it.each([
+    ['Linux', 'X64', true],
+    ['Linux', 'ARM64', true],
+    ['Linux', 'X86', true],
+    ['Windows', 'X64', true],
+    ['Windows', 'ARM64', true],
+    ['Windows', 'X86', false],
+    ['macOS', 'X64', true],
+    ['macOS', 'ARM64', false],
+    ['macOS', 'X86', false]
+  ])('%s %s cache=%s retains the explicit opt-out', (os, arch, expected) => {
     for (const enabled of ['true', 'false']) {
       expect(
-        evaluate(resolve.if, { runner: { os }, inputs: { 'cache-pnpm-verification': enabled } })
-      ).toBe(enabled === 'true')
+        evaluate(resolve.if, {
+          runner: { os, arch },
+          inputs: { 'cache-pnpm-verification': enabled }
+        })
+      ).toBe(expected && enabled === 'true')
     }
   })
 

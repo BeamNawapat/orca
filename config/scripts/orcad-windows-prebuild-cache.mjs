@@ -30,7 +30,17 @@ export const WINDOWS_PREBUILD_CACHE_INPUTS = [
   'config/scripts/windows-pe-machine.cjs',
   'config/scripts/pinned-node-downloads.mjs',
   'config/scripts/update-node-runtime-pin.mjs',
-  'config/scripts/script-child-process.mjs'
+  'config/scripts/script-child-process.mjs',
+  'src/shared/child-process/run-process.ts',
+  'src/shared/child-process/spawn-resolution.ts',
+  'src/shared/child-process/process-tree-termination.ts',
+  'src/shared/child-process/process-tree-kill-gate.ts',
+  'src/shared/child-process/spawn-observer.ts',
+  'src/shared/child-process/bounded-output-sink.ts',
+  'src/shared/child-process/child-termination-reporter.ts',
+  'src/shared/child-process/process-spec.ts',
+  'src/shared/child-process/windows-command-line.ts',
+  'src/shared/child-process/windows-cmd-shim-resolution.ts'
 ]
 
 function windowsSlot(platform, arch) {

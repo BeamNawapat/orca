@@ -106,7 +106,11 @@ runs:
 
     - name: Resolve pnpm verification cache
       id: verification-cache
-      if: inputs.cache-pnpm-verification == 'true'
+      if: >-
+        inputs.cache-pnpm-verification == 'true' &&
+        (runner.os == 'Linux' ||
+        (runner.os == 'Windows' && (runner.arch == 'X64' || runner.arch == 'ARM64')) ||
+        (runner.os == 'macOS' && runner.arch == 'X64'))
       shell: bash
       env:
         POLICY_HASH: ${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc') }}
