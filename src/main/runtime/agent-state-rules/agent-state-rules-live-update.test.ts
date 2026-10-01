@@ -14,12 +14,13 @@ import { BUNDLED_AGENT_STATE_RULES_VERSION } from './agent-state-rules-bundle'
 import { BUNDLED_AGENT_STATE_RULE_FILES } from './agent-state-rules-catalog'
 import { idleTitleRequiresQuiet } from './agent-state-rules-engine'
 import {
-  AGENT_STATE_RULES_FILE_NAME,
   AgentStateRulesLiveUpdater,
+  agentStateRulesCacheFileName,
   agentStateRulesChannelForAppVersion,
   agentStateRulesDownloadUrl,
   type AgentStateRulesLiveUpdateDeps
 } from './agent-state-rules-live-update'
+import { detectExplicitIdleStatusFromTitle } from '../terminal-wait-detection'
 import { showsIdleTitleAnchor } from './agent-state-title-anchors'
 
 const NEWER = '9999.1.1.1'
@@ -91,8 +92,12 @@ function serve(h: Harness, text: string): void {
   h.fetch.mockImplementation(async () => new Response(text, { status: 200 }))
 }
 
-function writeCache(text: string): void {
-  writeFileSync(join(userData, AGENT_STATE_RULES_FILE_NAME), text)
+function cachePath(channel: 'next' | 'stable' = 'stable'): string {
+  return join(userData, agentStateRulesCacheFileName(channel))
+}
+
+function writeCache(text: string, channel: 'next' | 'stable' = 'stable'): void {
+  writeFileSync(cachePath(channel), text)
 }
 
 beforeEach(() => {
@@ -148,8 +153,8 @@ describe('agent state rules live updates', () => {
       lastUpdateError: null
     })
     expect(idleTitleRequiresQuiet('claude')).toBe(false)
-    expect(readFileSync(join(userData, AGENT_STATE_RULES_FILE_NAME), 'utf8')).toBe(text)
-    expect(readdirSync(userData)).toEqual([AGENT_STATE_RULES_FILE_NAME])
+    expect(readFileSync(cachePath('next'), 'utf8')).toBe(text)
+    expect(readdirSync(userData)).toEqual([agentStateRulesCacheFileName('next')])
     expect(h.onActivated).toHaveBeenCalledWith({ version: NEWER, source: 'downloaded' })
     h.updater.stop()
   })
@@ -242,9 +247,7 @@ describe('agent state rules live updates', () => {
       source: 'downloaded',
       lastUpdateError: null
     })
-    expect(
-      JSON.parse(readFileSync(join(userData, AGENT_STATE_RULES_FILE_NAME), 'utf8'))
-    ).toMatchObject({ version: NEWEST })
+    expect(JSON.parse(readFileSync(cachePath(), 'utf8'))).toMatchObject({ version: NEWEST })
     h.updater.stop()
   })
 
@@ -264,6 +267,39 @@ describe('agent state rules live updates', () => {
     await h.updater.start()
     expect(getAgentStateRulesStatus().source).toBe('bundled')
     h.updater.stop()
+  })
+
+  it("never reads the other channel's cache", async () => {
+    // Why: an RC build left next rules in the userData a stable build now shares.
+    writeCache(bundleText(NEWEST), 'next')
+    const h = harness()
+    serve(h, bundleText(NEWER))
+    await h.updater.start()
+    expect(getAgentStateRulesStatus()).toMatchObject({ version: NEWER, source: 'downloaded' })
+    expect(JSON.parse(readFileSync(cachePath('next'), 'utf8'))).toMatchObject({ version: NEWEST })
+    h.updater.stop()
+  })
+
+  it('lets no superseded start or fetch change the rules after a restart', async () => {
+    const overridePath = join(userData, 'override.json')
+    writeFileSync(overridePath, bundleText('1.0', [bundledFile('gemini')]))
+    const h = harness()
+    let land: (response: Response) => void = () => {}
+    h.fetch.mockImplementation(() => new Promise<Response>((resolve) => (land = resolve)))
+    h.settings.agentStateRulesPath = overridePath
+    const superseded = h.updater.start()
+    await vi.waitFor(() => expect(h.fetch).toHaveBeenCalledTimes(1))
+    h.settings.agentStateRulesPath = null
+    h.settings.agentStateRulesLiveUpdates = false
+    await h.updater.start()
+    land(new Response(bundleText(NEWER), { status: 200 }))
+    await superseded
+    expect(getAgentStateRulesStatus()).toEqual({
+      version: BUNDLED_AGENT_STATE_RULES_VERSION,
+      source: 'bundled',
+      lastUpdateError: null
+    })
+    expect(readdirSync(userData)).toEqual(['override.json'])
   })
 
   it('refuses a download no newer than the cached one', async () => {
@@ -349,8 +385,9 @@ describe('agent state rules live updates', () => {
 })
 
 describe('agent state rules hot reload', () => {
-  it('recompiles the title anchors every pane reads', () => {
+  it('recompiles the title anchors every pane reads, past the title memo', () => {
     expect(showsIdleTitleAnchor('✳ Claude Code', 'idle')).toBe(true)
+    expect(detectExplicitIdleStatusFromTitle('✳ Claude Code')).toBe('idle')
     activateAgentStateRules({
       ...bundledAgentStateRules(),
       files: bundledAgentStateRules().files.map((file) =>
@@ -358,6 +395,7 @@ describe('agent state rules hot reload', () => {
       )
     })
     expect(showsIdleTitleAnchor('✳ Claude Code', 'idle')).toBe(false)
+    expect(detectExplicitIdleStatusFromTitle('✳ Claude Code')).toBeNull()
   })
 
   it('rescans a tail the sentinel index already covered when a blocked anchor arrives', () => {

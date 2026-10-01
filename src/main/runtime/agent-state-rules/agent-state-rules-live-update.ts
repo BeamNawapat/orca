@@ -12,7 +12,8 @@ import {
   getActiveAgentStateRules,
   overlayOnBundledAgentStateRules,
   setAgentStateRulesUpdateError,
-  type ActiveAgentStateRules
+  type ActiveAgentStateRules,
+  type AgentStateRulesSource
 } from './active-agent-state-rules'
 import {
   AGENT_STATE_RULES_BUNDLE_MAX_BYTES,
@@ -23,10 +24,10 @@ import {
 } from './agent-state-rules-bundle'
 import { AGENT_STATE_RULES_ENGINE_VERSION } from './agent-state-rules-schema'
 
-/** The published asset and the cached copy in userData share one name. */
-export const AGENT_STATE_RULES_FILE_NAME = 'agent-state-rules.json'
+/** The published asset's name; each channel caches it under its own name. */
+const AGENT_STATE_RULES_FILE_NAME = 'agent-state-rules.json'
 
-const DEFAULT_REFRESH_INTERVAL_MS = 4 * 60 * 60 * 1000
+const REFRESH_INTERVAL_MS = 4 * 60 * 60 * 1000
 const FETCH_TIMEOUT_MS = 30_000
 
 export type AgentStateRulesChannel = 'next' | 'stable'
@@ -48,6 +49,12 @@ export function agentStateRulesDownloadUrl(channel: AgentStateRulesChannel): str
   return `https://github.com/${MAIN_RELEASE_REPO}/releases/download/${tag}/${AGENT_STATE_RULES_FILE_NAME}`
 }
 
+// Why per channel: stable and RC builds share userData, and a stable app must not run, or be
+// held below, rules that only next has published.
+export function agentStateRulesCacheFileName(channel: AgentStateRulesChannel): string {
+  return `agent-state-rules-${channel}.json`
+}
+
 type LiveUpdateSettings = Pick<GlobalSettings, 'agentStateRulesPath' | 'agentStateRulesLiveUpdates'>
 
 export type AgentStateRulesLiveUpdateDeps = {
@@ -59,9 +66,10 @@ export type AgentStateRulesLiveUpdateDeps = {
   readSettings: () => LiveUpdateSettings | null | undefined
   env: NodeJS.ProcessEnv
   /** Called when the active version or source changes, for diagnostics and crash reports. */
-  onActivated: (rules: { version: string; source: string }) => void
-  refreshIntervalMs?: number
+  onActivated: (rules: { version: string; source: AgentStateRulesSource }) => void
 }
+
+type BundleRead = { bundle: AgentStateRulesBundle | null; error: string | null }
 
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -71,17 +79,49 @@ function isMissingFile(error: unknown): boolean {
   return error instanceof Error && 'code' in error && error.code === 'ENOENT'
 }
 
+function isNewerThan(bundle: AgentStateRulesBundle, version: string): boolean {
+  return compareAgentStateRulesVersions(bundle.version, version) > 0
+}
+
+function parseBundleRead(
+  label: string,
+  text: string,
+  scope: 'live-updatable' | 'any-agent'
+): BundleRead {
+  const parsed = parseAgentStateRulesBundle(text, scope)
+  return parsed.ok
+    ? { bundle: parsed.bundle, error: null }
+    : { bundle: null, error: `${label} rejected: ${parsed.error}` }
+}
+
+async function readBundleFile(
+  label: string,
+  path: string,
+  scope: 'live-updatable' | 'any-agent',
+  missingIsError: boolean
+): Promise<BundleRead> {
+  let text: string
+  try {
+    text = await readFile(path, 'utf8')
+  } catch (error) {
+    const missing = isMissingFile(error) && !missingIsError
+    return { bundle: null, error: missing ? null : `${label} unreadable: ${describeError(error)}` }
+  }
+  return parseBundleRead(label, text, scope)
+}
+
 /**
  * Keeps the active agent state rules current: a local override, else a downloaded copy newer than
  * the bundled one, else the bundled rules. Any failure keeps the last good copy active.
  */
 export class AgentStateRulesLiveUpdater {
-  private downloaded: AgentStateRulesBundle | null = null
   private override: AgentStateRulesBundle | null = null
+  /** Always newer than the bundled rules, so it is also the floor a download must clear. */
+  private downloaded: AgentStateRulesBundle | null = null
   private timer: ReturnType<typeof setInterval> | null = null
-  private inFlight: Promise<void> | null = null
-  // Why: a settings change restarts while an earlier start may still be reading files.
-  private startGeneration = 0
+  // Why: a settings change restarts while an earlier start or fetch may still be pending, and a
+  // superseded one must not change the active rules or the reported error.
+  private generation = 0
 
   constructor(private readonly deps: AgentStateRulesLiveUpdateDeps) {}
 
@@ -89,53 +129,83 @@ export class AgentStateRulesLiveUpdater {
    *  when the settings it reads change. */
   async start(): Promise<void> {
     this.stop()
-    const generation = ++this.startGeneration
-    await this.loadOverride()
-    const cached = this.liveUpdatesEnabled() ? await this.readCachedDownload() : null
-    if (generation !== this.startGeneration) {
+    const generation = this.generation
+    const channel = this.liveUpdateChannel()
+    const [override, cached] = await Promise.all([
+      this.readOverride(),
+      channel
+        ? readBundleFile('cached rules', this.cachePath(channel), 'live-updatable', false)
+        : null
+    ])
+    if (generation !== this.generation) {
       return
     }
-    this.downloaded = cached
+    this.recordError(override?.error ?? cached?.error ?? null)
+    this.override = override?.bundle ?? null
+    // Why re-check the version: an app update may have bundled rules newer than the cache.
+    const downloaded = cached?.bundle
+    this.downloaded =
+      downloaded && isNewerThan(downloaded, BUNDLED_AGENT_STATE_RULES_VERSION) ? downloaded : null
     this.activate()
-    if (!this.liveUpdatesEnabled() || !this.channel()) {
+    if (!channel) {
       return
     }
-    this.timer = setInterval(
-      () => void this.refresh(),
-      this.deps.refreshIntervalMs ?? DEFAULT_REFRESH_INTERVAL_MS
-    )
+    this.timer = setInterval(() => void this.refresh(), REFRESH_INTERVAL_MS)
     this.timer.unref?.()
     await this.refresh()
   }
 
   stop(): void {
+    this.generation += 1
     if (this.timer) {
       clearInterval(this.timer)
       this.timer = null
     }
   }
 
-  refresh(): Promise<void> {
-    this.inFlight ??= this.downloadAndAccept().finally(() => {
-      this.inFlight = null
-    })
-    return this.inFlight
+  /** Fetches the channel's file now; does nothing unless started with live updates on. */
+  async refresh(): Promise<void> {
+    const channel = this.liveUpdateChannel()
+    if (!this.timer || !channel) {
+      return
+    }
+    const generation = this.generation
+    const fetched = await this.fetchText(channel)
+    if (generation !== this.generation) {
+      return
+    }
+    if (typeof fetched !== 'string') {
+      this.recordError(fetched.error)
+      return
+    }
+    const { bundle, error } = parseBundleRead('download', fetched, 'live-updatable')
+    this.recordError(error)
+    // Why newer than both: an app whose bundled rules already hold a fix must not be shadowed by
+    // an older download, and a cached copy must never be replaced by an older one.
+    const floor = this.downloaded?.version ?? BUNDLED_AGENT_STATE_RULES_VERSION
+    if (!bundle || !isNewerThan(bundle, floor)) {
+      return
+    }
+    this.downloaded = bundle
+    this.activate()
+    try {
+      await writePluginFileAtomically(this.cachePath(channel), fetched)
+    } catch (error) {
+      this.recordError(`downloaded rules not cached: ${describeError(error)}`)
+    }
   }
 
-  private channel(): AgentStateRulesChannel | null {
-    return agentStateRulesChannelForAppVersion(this.deps.appVersion)
-  }
-
-  private liveUpdatesEnabled(): boolean {
-    return (
+  /** The channel to fetch, or null when this build or its settings take no downloads. */
+  private liveUpdateChannel(): AgentStateRulesChannel | null {
+    const enabled =
       this.deps.isPackaged &&
       this.deps.env.ORCA_DISABLE_AGENT_STATE_RULES_UPDATES !== '1' &&
       this.deps.readSettings()?.agentStateRulesLiveUpdates !== false
-    )
+    return enabled ? agentStateRulesChannelForAppVersion(this.deps.appVersion) : null
   }
 
-  private cachePath(): string {
-    return join(this.deps.userDataPath, AGENT_STATE_RULES_FILE_NAME)
+  private cachePath(channel: AgentStateRulesChannel): string {
+    return join(this.deps.userDataPath, agentStateRulesCacheFileName(channel))
   }
 
   private recordError(error: string | null): void {
@@ -145,54 +215,15 @@ export class AgentStateRulesLiveUpdater {
     }
   }
 
-  private async loadOverride(): Promise<void> {
-    this.override = null
+  private readOverride(): Promise<BundleRead> | null {
     const path =
       this.deps.env.ORCA_AGENT_STATE_RULES_PATH || this.deps.readSettings()?.agentStateRulesPath
-    if (!path) {
-      return
-    }
-    let text: string
-    try {
-      text = await readFile(path, 'utf8')
-    } catch (error) {
-      this.recordError(`override ${path} unreadable: ${describeError(error)}`)
-      return
-    }
     // Why any agent: the user chose this file, so the transcript gate on releases does not apply.
-    const parsed = parseAgentStateRulesBundle(text, 'any-agent')
-    if (!parsed.ok) {
-      this.recordError(`override ${path} rejected: ${parsed.error}`)
-      return
-    }
-    this.override = parsed.bundle
+    return path ? readBundleFile(`override ${path}`, path, 'any-agent', true) : null
   }
 
-  private async readCachedDownload(): Promise<AgentStateRulesBundle | null> {
-    let text: string
-    try {
-      text = await readFile(this.cachePath(), 'utf8')
-    } catch (error) {
-      if (!isMissingFile(error)) {
-        this.recordError(`cached rules unreadable: ${describeError(error)}`)
-      }
-      return null
-    }
-    // Why re-validate: the cache may come from an older build with another engine or schema.
-    const parsed = parseAgentStateRulesBundle(text, 'live-updatable')
-    if (!parsed.ok) {
-      this.recordError(`cached rules rejected: ${parsed.error}`)
-      return null
-    }
-    return parsed.bundle
-  }
-
-  private async downloadAndAccept(): Promise<void> {
-    const channel = this.channel()
-    if (!channel || !this.liveUpdatesEnabled()) {
-      return
-    }
-    let text: string
+  /** The published file's text, or why there is none. */
+  private async fetchText(channel: AgentStateRulesChannel): Promise<string | { error: string }> {
     try {
       const response = await this.deps.fetch(agentStateRulesDownloadUrl(channel), {
         redirect: 'follow',
@@ -201,58 +232,24 @@ export class AgentStateRulesLiveUpdater {
       if (!response.ok) {
         await response.body?.cancel().catch(() => undefined)
         // Why not fatal: a 404 is also what a re-upload in progress looks like.
-        this.recordError(`download failed: HTTP ${response.status}`)
-        return
+        return { error: `download failed: HTTP ${response.status}` }
       }
-      text = await readFetchResponseTextWithinLimit(response, AGENT_STATE_RULES_BUNDLE_MAX_BYTES)
+      return await readFetchResponseTextWithinLimit(response, AGENT_STATE_RULES_BUNDLE_MAX_BYTES)
     } catch (error) {
-      this.recordError(`download failed: ${describeError(error)}`)
-      return
-    }
-    const parsed = parseAgentStateRulesBundle(text, 'live-updatable')
-    if (!parsed.ok) {
-      this.recordError(`download rejected: ${parsed.error}`)
-      return
-    }
-    // Why newer than both: an app whose bundled rules already hold a fix must not be shadowed
-    // by an older download, and a cached copy must never be replaced by an older one.
-    const floors = [BUNDLED_AGENT_STATE_RULES_VERSION, this.downloaded?.version ?? '0']
-    if (floors.some((floor) => compareAgentStateRulesVersions(parsed.bundle.version, floor) <= 0)) {
-      this.recordError(null)
-      return
-    }
-    this.downloaded = parsed.bundle
-    this.activate()
-    try {
-      await writePluginFileAtomically(this.cachePath(), text)
-      this.recordError(null)
-    } catch (error) {
-      this.recordError(`downloaded rules not cached: ${describeError(error)}`)
+      return { error: `download failed: ${describeError(error)}` }
     }
   }
 
   private resolveActive(): ActiveAgentStateRules {
-    if (this.override) {
-      return {
-        files: overlayOnBundledAgentStateRules(this.override.files),
-        version: this.override.version,
-        source: 'override'
-      }
+    const chosen = this.override ?? (this.downloaded?.bundledOnly ? null : this.downloaded)
+    if (!chosen) {
+      return bundledAgentStateRules()
     }
-    const downloaded = this.downloaded
-    if (
-      downloaded &&
-      !downloaded.bundledOnly &&
-      this.liveUpdatesEnabled() &&
-      compareAgentStateRulesVersions(downloaded.version, BUNDLED_AGENT_STATE_RULES_VERSION) > 0
-    ) {
-      return {
-        files: overlayOnBundledAgentStateRules(downloaded.files),
-        version: downloaded.version,
-        source: 'downloaded'
-      }
+    return {
+      files: overlayOnBundledAgentStateRules(chosen.files),
+      version: chosen.version,
+      source: chosen === this.override ? 'override' : 'downloaded'
     }
-    return bundledAgentStateRules()
   }
 
   private activate(): void {
@@ -271,9 +268,9 @@ export class AgentStateRulesLiveUpdater {
  */
 export function startAgentStateRulesLiveUpdates(options: {
   readSettings: () => LiveUpdateSettings | null | undefined
-  onSettingsChanged?: (listener: (updates: Partial<GlobalSettings>) => void) => void
+  onSettingsChanged: (listener: (updates: Partial<GlobalSettings>) => void) => void
   onActivated: AgentStateRulesLiveUpdateDeps['onActivated']
-}): AgentStateRulesLiveUpdater {
+}): void {
   const environment = getAppEnvironment()
   const updater = new AgentStateRulesLiveUpdater({
     userDataPath: environment.getPath('userData'),
@@ -285,11 +282,10 @@ export function startAgentStateRulesLiveUpdates(options: {
     onActivated: options.onActivated
   })
   void updater.start()
-  options.onSettingsChanged?.((updates) => {
+  options.onSettingsChanged((updates) => {
     if ('agentStateRulesPath' in updates || 'agentStateRulesLiveUpdates' in updates) {
       void updater.start()
     }
   })
   environment.onWillQuit(() => updater.stop())
-  return updater
 }
