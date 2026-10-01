@@ -41,66 +41,66 @@ jobs:
         with:
           cache-pnpm-verification: 'false'
       - name: Preserve the authentic seed and frozen install inputs
-        run: node config/scripts/ci-pnpm-verification-benchmark.mjs --phase seed
+        run: pnpm exec node config/scripts/ci-pnpm-verification-benchmark.mjs --phase seed
       # These tiny trial caches belong to this run and PR ref, never production keys.
       - uses: actions/cache/save@v5
         with:
           path: ${{ runner.temp }}/pnpm-verification-trial/cache/lockfile-verified.jsonl
           key: pnpm-record-trial-${{ runner.os }}-${{ runner.arch }}-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Begin pair 1 baseline
-        run: node config/scripts/ci-pnpm-verification-benchmark.mjs --phase begin --sample 1 --treatment baseline
+        run: pnpm exec node config/scripts/ci-pnpm-verification-benchmark.mjs --phase begin --sample 1 --treatment baseline
       - name: Measure pair 1 baseline
-        run: node config/scripts/ci-pnpm-verification-benchmark.mjs --phase measure
+        run: pnpm exec node config/scripts/ci-pnpm-verification-benchmark.mjs --phase measure
       - name: Begin pair 1 restored
-        run: node config/scripts/ci-pnpm-verification-benchmark.mjs --phase begin --sample 1 --treatment restored
+        run: pnpm exec node config/scripts/ci-pnpm-verification-benchmark.mjs --phase begin --sample 1 --treatment restored
       - uses: actions/cache/restore@v5
         with:
           path: ${{ runner.temp }}/pnpm-verification-trial/cache/lockfile-verified.jsonl
           key: pnpm-record-trial-${{ runner.os }}-${{ runner.arch }}-${{ github.run_id }}-${{ github.run_attempt }}
           fail-on-cache-miss: true
       - name: Measure pair 1 restored
-        run: node config/scripts/ci-pnpm-verification-benchmark.mjs --phase measure
+        run: pnpm exec node config/scripts/ci-pnpm-verification-benchmark.mjs --phase measure
       - name: Begin pair 2 restored
-        run: node config/scripts/ci-pnpm-verification-benchmark.mjs --phase begin --sample 2 --treatment restored
+        run: pnpm exec node config/scripts/ci-pnpm-verification-benchmark.mjs --phase begin --sample 2 --treatment restored
       - uses: actions/cache/restore@v5
         with:
           path: ${{ runner.temp }}/pnpm-verification-trial/cache/lockfile-verified.jsonl
           key: pnpm-record-trial-${{ runner.os }}-${{ runner.arch }}-${{ github.run_id }}-${{ github.run_attempt }}
           fail-on-cache-miss: true
       - name: Measure pair 2 restored
-        run: node config/scripts/ci-pnpm-verification-benchmark.mjs --phase measure
+        run: pnpm exec node config/scripts/ci-pnpm-verification-benchmark.mjs --phase measure
       - name: Begin pair 2 baseline
-        run: node config/scripts/ci-pnpm-verification-benchmark.mjs --phase begin --sample 2 --treatment baseline
+        run: pnpm exec node config/scripts/ci-pnpm-verification-benchmark.mjs --phase begin --sample 2 --treatment baseline
       - name: Measure pair 2 baseline
-        run: node config/scripts/ci-pnpm-verification-benchmark.mjs --phase measure
+        run: pnpm exec node config/scripts/ci-pnpm-verification-benchmark.mjs --phase measure
       - name: Begin pair 3 baseline
-        run: node config/scripts/ci-pnpm-verification-benchmark.mjs --phase begin --sample 3 --treatment baseline
+        run: pnpm exec node config/scripts/ci-pnpm-verification-benchmark.mjs --phase begin --sample 3 --treatment baseline
       - name: Measure pair 3 baseline
-        run: node config/scripts/ci-pnpm-verification-benchmark.mjs --phase measure
+        run: pnpm exec node config/scripts/ci-pnpm-verification-benchmark.mjs --phase measure
       - name: Begin pair 3 restored
-        run: node config/scripts/ci-pnpm-verification-benchmark.mjs --phase begin --sample 3 --treatment restored
+        run: pnpm exec node config/scripts/ci-pnpm-verification-benchmark.mjs --phase begin --sample 3 --treatment restored
       - uses: actions/cache/restore@v5
         with:
           path: ${{ runner.temp }}/pnpm-verification-trial/cache/lockfile-verified.jsonl
           key: pnpm-record-trial-${{ runner.os }}-${{ runner.arch }}-${{ github.run_id }}-${{ github.run_attempt }}
           fail-on-cache-miss: true
       - name: Measure pair 3 restored
-        run: node config/scripts/ci-pnpm-verification-benchmark.mjs --phase measure
+        run: pnpm exec node config/scripts/ci-pnpm-verification-benchmark.mjs --phase measure
       - name: Begin pair 4 restored
-        run: node config/scripts/ci-pnpm-verification-benchmark.mjs --phase begin --sample 4 --treatment restored
+        run: pnpm exec node config/scripts/ci-pnpm-verification-benchmark.mjs --phase begin --sample 4 --treatment restored
       - uses: actions/cache/restore@v5
         with:
           path: ${{ runner.temp }}/pnpm-verification-trial/cache/lockfile-verified.jsonl
           key: pnpm-record-trial-${{ runner.os }}-${{ runner.arch }}-${{ github.run_id }}-${{ github.run_attempt }}
           fail-on-cache-miss: true
       - name: Measure pair 4 restored
-        run: node config/scripts/ci-pnpm-verification-benchmark.mjs --phase measure
+        run: pnpm exec node config/scripts/ci-pnpm-verification-benchmark.mjs --phase measure
       - name: Begin pair 4 baseline
-        run: node config/scripts/ci-pnpm-verification-benchmark.mjs --phase begin --sample 4 --treatment baseline
+        run: pnpm exec node config/scripts/ci-pnpm-verification-benchmark.mjs --phase begin --sample 4 --treatment baseline
       - name: Measure pair 4 baseline
-        run: node config/scripts/ci-pnpm-verification-benchmark.mjs --phase measure
+        run: pnpm exec node config/scripts/ci-pnpm-verification-benchmark.mjs --phase measure
       - name: Verify policy rejection controls and summarize paired timings
-        run: node config/scripts/ci-pnpm-verification-benchmark.mjs --phase finish
+        run: pnpm exec node config/scripts/ci-pnpm-verification-benchmark.mjs --phase finish
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -131,7 +131,7 @@ jobs:
           pnpm build:orcad-prebuilds --smoke
           pnpm build:orcad
           pnpm test:node-server --artifact
-          node config/scripts/ci-windows-prebuild-benchmark.mjs --phase seed
+          pnpm exec node config/scripts/ci-windows-prebuild-benchmark.mjs --phase seed
       - name: Resolve the exact compiled-slot identity
         id: identity
         run: node config/scripts/orcad-windows-prebuild-cache.mjs --fingerprint
@@ -140,59 +140,59 @@ jobs:
           path: ${{ steps.identity.outputs.path }}
           key: ${{ steps.identity.outputs.key }}-trial-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Begin prebuild pair 1 fresh
-        run: node config/scripts/ci-windows-prebuild-benchmark.mjs --phase begin --sample 1 --treatment fresh
+        run: pnpm exec node config/scripts/ci-windows-prebuild-benchmark.mjs --phase begin --sample 1 --treatment fresh
       - name: Measure prebuild pair 1 fresh
-        run: node config/scripts/ci-windows-prebuild-benchmark.mjs --phase measure
+        run: pnpm exec node config/scripts/ci-windows-prebuild-benchmark.mjs --phase measure
       - name: Begin prebuild pair 1 restored
-        run: node config/scripts/ci-windows-prebuild-benchmark.mjs --phase begin --sample 1 --treatment restored
+        run: pnpm exec node config/scripts/ci-windows-prebuild-benchmark.mjs --phase begin --sample 1 --treatment restored
       - uses: actions/cache/restore@v5
         with:
           path: ${{ steps.identity.outputs.path }}
           key: ${{ steps.identity.outputs.key }}-trial-${{ github.run_id }}-${{ github.run_attempt }}
           fail-on-cache-miss: true
       - name: Measure prebuild pair 1 restored
-        run: node config/scripts/ci-windows-prebuild-benchmark.mjs --phase measure
+        run: pnpm exec node config/scripts/ci-windows-prebuild-benchmark.mjs --phase measure
       - name: Begin prebuild pair 2 restored
-        run: node config/scripts/ci-windows-prebuild-benchmark.mjs --phase begin --sample 2 --treatment restored
+        run: pnpm exec node config/scripts/ci-windows-prebuild-benchmark.mjs --phase begin --sample 2 --treatment restored
       - uses: actions/cache/restore@v5
         with:
           path: ${{ steps.identity.outputs.path }}
           key: ${{ steps.identity.outputs.key }}-trial-${{ github.run_id }}-${{ github.run_attempt }}
           fail-on-cache-miss: true
       - name: Measure prebuild pair 2 restored
-        run: node config/scripts/ci-windows-prebuild-benchmark.mjs --phase measure
+        run: pnpm exec node config/scripts/ci-windows-prebuild-benchmark.mjs --phase measure
       - name: Begin prebuild pair 2 fresh
-        run: node config/scripts/ci-windows-prebuild-benchmark.mjs --phase begin --sample 2 --treatment fresh
+        run: pnpm exec node config/scripts/ci-windows-prebuild-benchmark.mjs --phase begin --sample 2 --treatment fresh
       - name: Measure prebuild pair 2 fresh
-        run: node config/scripts/ci-windows-prebuild-benchmark.mjs --phase measure
+        run: pnpm exec node config/scripts/ci-windows-prebuild-benchmark.mjs --phase measure
       - name: Begin prebuild pair 3 fresh
-        run: node config/scripts/ci-windows-prebuild-benchmark.mjs --phase begin --sample 3 --treatment fresh
+        run: pnpm exec node config/scripts/ci-windows-prebuild-benchmark.mjs --phase begin --sample 3 --treatment fresh
       - name: Measure prebuild pair 3 fresh
-        run: node config/scripts/ci-windows-prebuild-benchmark.mjs --phase measure
+        run: pnpm exec node config/scripts/ci-windows-prebuild-benchmark.mjs --phase measure
       - name: Begin prebuild pair 3 restored
-        run: node config/scripts/ci-windows-prebuild-benchmark.mjs --phase begin --sample 3 --treatment restored
+        run: pnpm exec node config/scripts/ci-windows-prebuild-benchmark.mjs --phase begin --sample 3 --treatment restored
       - uses: actions/cache/restore@v5
         with:
           path: ${{ steps.identity.outputs.path }}
           key: ${{ steps.identity.outputs.key }}-trial-${{ github.run_id }}-${{ github.run_attempt }}
           fail-on-cache-miss: true
       - name: Measure prebuild pair 3 restored
-        run: node config/scripts/ci-windows-prebuild-benchmark.mjs --phase measure
+        run: pnpm exec node config/scripts/ci-windows-prebuild-benchmark.mjs --phase measure
       - name: Begin prebuild pair 4 restored
-        run: node config/scripts/ci-windows-prebuild-benchmark.mjs --phase begin --sample 4 --treatment restored
+        run: pnpm exec node config/scripts/ci-windows-prebuild-benchmark.mjs --phase begin --sample 4 --treatment restored
       - uses: actions/cache/restore@v5
         with:
           path: ${{ steps.identity.outputs.path }}
           key: ${{ steps.identity.outputs.key }}-trial-${{ github.run_id }}-${{ github.run_attempt }}
           fail-on-cache-miss: true
       - name: Measure prebuild pair 4 restored
-        run: node config/scripts/ci-windows-prebuild-benchmark.mjs --phase measure
+        run: pnpm exec node config/scripts/ci-windows-prebuild-benchmark.mjs --phase measure
       - name: Begin prebuild pair 4 fresh
-        run: node config/scripts/ci-windows-prebuild-benchmark.mjs --phase begin --sample 4 --treatment fresh
+        run: pnpm exec node config/scripts/ci-windows-prebuild-benchmark.mjs --phase begin --sample 4 --treatment fresh
       - name: Measure prebuild pair 4 fresh
-        run: node config/scripts/ci-windows-prebuild-benchmark.mjs --phase measure
+        run: pnpm exec node config/scripts/ci-windows-prebuild-benchmark.mjs --phase measure
       - name: Qualify a final restored slot
-        run: node config/scripts/ci-windows-prebuild-benchmark.mjs --phase begin --sample 1 --treatment restored
+        run: pnpm exec node config/scripts/ci-windows-prebuild-benchmark.mjs --phase begin --sample 1 --treatment restored
       - uses: actions/cache/restore@v5
         with:
           path: ${{ steps.identity.outputs.path }}
@@ -204,7 +204,7 @@ jobs:
           pnpm build:orcad-prebuilds --smoke
           pnpm build:orcad
           pnpm test:node-server --artifact
-          node config/scripts/ci-windows-prebuild-benchmark.mjs --phase finish
+          pnpm exec node config/scripts/ci-windows-prebuild-benchmark.mjs --phase finish
       - uses: actions/setup-node@v6
         if: runner.arch == 'X64'
         with:
