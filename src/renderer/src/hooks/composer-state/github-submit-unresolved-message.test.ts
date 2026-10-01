@@ -1,13 +1,22 @@
 import { describe, expect, it } from 'vitest'
+import { getSmartGitHubSubmitIntent, type SmartGitHubSubmitIntent } from '@/lib/smart-github-submit'
 import { getUnresolvedSmartGitHubSubmitMessage } from './github-submit-unresolved-message'
 
 const GENERIC = 'Could not resolve the GitHub item before creating the workspace.'
 
+function intentFor(input: string): SmartGitHubSubmitIntent {
+  const intent = getSmartGitHubSubmitIntent(input)
+  if (!intent) {
+    throw new Error(`expected a GitHub intent for ${input}`)
+  }
+  return intent
+}
+
 describe('getUnresolvedSmartGitHubSubmitMessage', () => {
-  it('names the linked issue when a pasted URL cannot be loaded for the project', () => {
+  it('names a pasted github.com issue without the default host', () => {
     expect(
       getUnresolvedSmartGitHubSubmitMessage(
-        { kind: 'link', owner: 'org', repo: 'app-client-a', number: 144, type: 'issue' },
+        intentFor('https://github.com/org/app-client-a/issues/144'),
         true
       )
     ).toBe(
@@ -17,11 +26,8 @@ describe('getUnresolvedSmartGitHubSubmitMessage', () => {
 
   it('names pull request links the same way', () => {
     expect(
-      getUnresolvedSmartGitHubSubmitMessage(
-        { kind: 'link', owner: 'org', repo: 'other', number: 9, type: 'pr' },
-        true
-      )
-    ).toContain('org/other#9')
+      getUnresolvedSmartGitHubSubmitMessage(intentFor('https://github.com/org/other/pull/9'), true)
+    ).toContain('Could not load org/other#9.')
   })
 
   it('keeps the GitHub Enterprise host so the repository is unambiguous', () => {
@@ -37,22 +43,17 @@ describe('getUnresolvedSmartGitHubSubmitMessage', () => {
         },
         true
       )
-    ).toContain('ghe.example.com/org/app#3')
+    ).toContain('Could not load ghe.example.com/org/app#3.')
   })
 
   it('keeps the generic message for #number lookups', () => {
-    expect(getUnresolvedSmartGitHubSubmitMessage({ kind: 'hash-number', number: 7 }, true)).toBe(
-      GENERIC
-    )
+    expect(getUnresolvedSmartGitHubSubmitMessage(intentFor('#7'), true)).toBe(GENERIC)
   })
 
   it('keeps the generic message when no single git project was looked up', () => {
     // Project groups search several repositories; folder projects never run the lookup.
     expect(
-      getUnresolvedSmartGitHubSubmitMessage(
-        { kind: 'link', owner: 'org', repo: 'app', number: 1, type: 'issue' },
-        false
-      )
+      getUnresolvedSmartGitHubSubmitMessage(intentFor('https://github.com/org/app/issues/1'), false)
     ).toBe(GENERIC)
   })
 })
