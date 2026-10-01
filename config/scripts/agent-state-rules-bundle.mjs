@@ -6,7 +6,7 @@
 //   node config/scripts/agent-state-rules-bundle.mjs build <out> [--bundled-only]
 //   node config/scripts/agent-state-rules-bundle.mjs gate-files
 //   node config/scripts/agent-state-rules-bundle.mjs publish <tag> <file> <target-commit>
-//   node config/scripts/agent-state-rules-bundle.mjs promote <next-tag> <stable-tag> <target-commit>
+//   node config/scripts/agent-state-rules-bundle.mjs promote <target-commit>
 
 import { spawnSync } from 'node:child_process'
 import { appendFileSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
@@ -142,7 +142,7 @@ function releaseExists(gh, repo, tag) {
  * injectable so the sequence is testable without a repository.
  */
 export function publishAgentStateRules({ repo, tag, file, target, gh = runGh }) {
-  const channel = AGENT_STATE_RULES_TAG.exec(tag)?.[2]
+  const [, engine, channel] = AGENT_STATE_RULES_TAG.exec(tag) ?? []
   if (!channel) {
     throw new Error(`not an agent state rules tag: ${tag}`)
   }
@@ -150,7 +150,12 @@ export function publishAgentStateRules({ repo, tag, file, target, gh = runGh }) 
     throw new Error(`the asset must be named ${AGENT_STATE_RULES_ASSET}, not ${basename(file)}`)
   }
   const candidateText = readFileSync(file, 'utf8')
-  const title = `Agent state rules ${JSON.parse(candidateText).version} (${channel})`
+  const candidate = JSON.parse(candidateText)
+  // Why: apps on one engine fetch one tag, and refuse a file built for another engine.
+  if (String(candidate.engineVersion) !== engine) {
+    throw new Error(`${file} is built for rules engine ${candidate.engineVersion}, not ${tag}`)
+  }
+  const title = `Agent state rules ${candidate.version} (${channel})`
   if (releaseExists(gh, repo, tag)) {
     const publishedDir = mkdtempSync(join(tmpdir(), 'agent-state-rules-published-'))
     // Why throw on a missing asset: a release without its file means an earlier upload broke.
@@ -207,7 +212,11 @@ export function publishAgentStateRules({ repo, tag, file, target, gh = runGh }) 
   return latest.trim()
 }
 
-/** Why no rebuild: stable gets exactly the bytes RC and dev builds soaked on next. */
+/**
+ * Why no rebuild and no re-gate: stable gets exactly the bytes RC and dev builds soaked on next,
+ * which only the gated publish-next job writes. A bundledOnly next is promoted too: that is how
+ * stable rolls back to the rules it shipped.
+ */
 export function promoteAgentStateRules({ repo, nextTag, stableTag, target, gh = runGh }) {
   const nextDir = mkdtempSync(join(tmpdir(), 'agent-state-rules-next-'))
   ghOrThrow(gh, [
@@ -258,12 +267,7 @@ async function main(argv) {
         bundledOnly: args.includes('--bundled-only')
       })
       writeFileSync(out, text)
-      writeOutputs({
-        version: bundle.version,
-        engine_version: bundle.engineVersion,
-        next_tag: agentStateRulesTag(bundle.engineVersion, 'next'),
-        stable_tag: agentStateRulesTag(bundle.engineVersion, 'stable')
-      })
+      writeOutputs({ next_tag: agentStateRulesTag(bundle.engineVersion, 'next') })
       return
     }
     case 'gate-files':
@@ -276,7 +280,10 @@ async function main(argv) {
       return
     }
     case 'promote': {
-      const [nextTag, stableTag, target] = args
+      const [target] = args
+      const { engineVersion } = buildAgentStateRulesBundle().bundle
+      const nextTag = agentStateRulesTag(engineVersion, 'next')
+      const stableTag = agentStateRulesTag(engineVersion, 'stable')
       const latest = promoteAgentStateRules({ repo: requireRepo(), nextTag, stableTag, target })
       console.log(`Promoted ${nextTag} to ${stableTag}; Latest is still ${latest}.`)
       return

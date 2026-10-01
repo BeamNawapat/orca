@@ -224,7 +224,7 @@ export type AgentStateRulesExplanation = {
   rulesFile: RulesKey
   /** The first matching rule in priority order: the one `evaluateAgentStateRules` answers with. */
   deciding: { ruleId: string; region: Region } | null
-  rules: {
+  evaluated: {
     ruleId: string
     region: Region
     priority: number
@@ -246,18 +246,18 @@ export function explainAgentStateRules(
   regions: AgentStateRegions
 ): AgentStateRulesExplanation {
   const reads = regionReads(regions)
-  const rules = (compiledFileFor(agent)?.rules ?? []).map((rule) => ({
+  const evaluated = (compiledFileFor(agent)?.rules ?? []).map((rule) => ({
     ruleId: rule.verdict.ruleId,
     region: rule.region,
     priority: rule.priority,
     answer: rule.answer,
     outcome: ruleOutcome(rule, reads, regions)
   }))
-  const deciding = rules.find((rule) => rule.outcome === 'matched')
+  const deciding = evaluated.find((rule) => rule.outcome === 'matched')
   return {
     rulesFile: rulesKeyFor(agent),
     deciding: deciding ? { ruleId: deciding.ruleId, region: deciding.region } : null,
-    rules,
+    evaluated,
     regions: {
       screen: reads.screen(),
       title: reads.title(),

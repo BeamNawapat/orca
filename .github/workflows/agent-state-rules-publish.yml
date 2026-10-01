@@ -4,9 +4,11 @@ name: Publish agent state rules
 # this from main, in the protected agent-state-rules environment, first to `next` (RC and dev
 # builds), then promotes the identical file to `stable` after a soak.
 #
-# Why GITHUB_TOKEN: release-policy.yml authorizes bot-authored agent-state-rules-* prereleases
-# and deletes any other author's. Why prerelease with --latest=false: the app updater follows
-# GitHub's Latest release, which a rules release must never become.
+# Why GITHUB_TOKEN: release-policy.yml deletes an agent-state-rules-* release any other author
+# publishes. Its releases start no workflow, so release-policy.yml sees them only when someone
+# edits one by hand, and then accepts them as bot-authored prereleases. Why prerelease with
+# --latest=false: the app updater follows GitHub's Latest release, which a rules release must
+# never become.
 on:
   workflow_dispatch:
     inputs:
@@ -18,7 +20,7 @@ on:
           - publish-next
           - promote-stable
       bundled_only:
-        description: 'publish-next only: tell apps to fall back to the rules they shipped with'
+        description: 'publish-next: tell apps to fall back to the rules they shipped with; promote-stable then carries it to stable'
         required: false
         type: boolean
         default: false
@@ -36,7 +38,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
-      version: ${{ steps.build.outputs.version }}
       next-tag: ${{ steps.build.outputs.next_tag }}
       commit: ${{ steps.build.outputs.commit }}
     steps:
@@ -105,12 +106,7 @@ jobs:
         with:
           ref: main
           persist-credentials: false
-      - name: Resolve the tags for this engine
-        id: tags
-        run: node config/scripts/agent-state-rules-bundle.mjs build "$RUNNER_TEMP/main-build.json"
       - name: Copy the next file to stable
         env:
           GH_TOKEN: ${{ github.token }}
-          NEXT_TAG: ${{ steps.tags.outputs.next_tag }}
-          STABLE_TAG: ${{ steps.tags.outputs.stable_tag }}
-        run: node config/scripts/agent-state-rules-bundle.mjs promote "$NEXT_TAG" "$STABLE_TAG" "$(git rev-parse HEAD)"
+        run: node config/scripts/agent-state-rules-bundle.mjs promote "$(git rev-parse HEAD)"

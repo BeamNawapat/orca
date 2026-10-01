@@ -149,10 +149,10 @@ function fakeGh({ releases = {}, latest = 'v1.4.2' } = {}) {
   return { gh, calls, releases }
 }
 
-function candidateFile(version) {
+function candidateFile(version, engineVersion = 1) {
   const dir = mkdtempSync(join(tmpdir(), 'agent-state-rules-candidate-'))
   const path = join(dir, AGENT_STATE_RULES_ASSET)
-  writeFileSync(path, `${JSON.stringify({ version, engineVersion: 1, files: [] })}\n`)
+  writeFileSync(path, `${JSON.stringify({ version, engineVersion, files: [] })}\n`)
   return path
 }
 
@@ -221,7 +221,7 @@ describe('publishAgentStateRules', () => {
     ).toThrow('not a stable desktop release')
   })
 
-  it('refuses a tag outside the rules family or a misnamed asset', () => {
+  it("refuses a tag outside the rules family, a misnamed asset or another engine's file", () => {
     const fake = fakeGh()
     expect(() =>
       publishAgentStateRules({
@@ -237,6 +237,15 @@ describe('publishAgentStateRules', () => {
     expect(() =>
       publishAgentStateRules({ repo: REPO, tag: NEXT, file: misnamed, target: 'abc', gh: fake.gh })
     ).toThrow('must be named')
+    expect(() =>
+      publishAgentStateRules({
+        repo: REPO,
+        tag: NEXT,
+        file: candidateFile('2026.10.02.1', 2),
+        target: 'abc',
+        gh: fake.gh
+      })
+    ).toThrow('built for rules engine 2')
     expect(fake.calls).toEqual([])
   })
 

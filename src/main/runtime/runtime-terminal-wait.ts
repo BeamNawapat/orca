@@ -95,7 +95,6 @@ export class RuntimeTerminalWait {
       record.preview
     )
     const verdict = evaluate(waitText)
-    const rules = explainAgentRuleEvidence(this.deps, record, () => waitText)
     const status = getAgentStateRulesStatus()
     return {
       handle,
@@ -103,12 +102,7 @@ export class RuntimeTerminalWait {
       state: verdict.kind,
       ...(verdict.kind === 'blocked' ? { blockedReason: verdict.reason } : {}),
       ...(verdict.kind === 'pending' ? { quietForeground: verdict.quietForeground } : {}),
-      rules: {
-        rulesFile: rules.rulesFile,
-        deciding: rules.deciding,
-        evaluated: rules.rules,
-        regions: rules.regions
-      },
+      rules: explainAgentRuleEvidence(this.deps, record, () => waitText),
       rulesVersion: status.version,
       rulesSource: status.source,
       lastUpdateError: status.lastUpdateError

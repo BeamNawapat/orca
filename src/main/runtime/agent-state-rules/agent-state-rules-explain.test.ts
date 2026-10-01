@@ -11,7 +11,7 @@ describe('explainAgentStateRules', () => {
     }
     const explanation = explainAgentStateRules('codex', regions)
     expect(explanation.rulesFile).toBe('codex')
-    expect(explanation.rules.map((rule) => [rule.ruleId, rule.outcome])).toEqual([
+    expect(explanation.evaluated.map((rule) => [rule.ruleId, rule.outcome])).toEqual([
       ['header_ready', 'not-matched'],
       ['composer_ready', 'skipped-without-clock'],
       ['text_header_ready', 'not-matched'],
@@ -28,7 +28,7 @@ describe('explainAgentStateRules', () => {
 
   it('marks a rule whose region has no trustworthy copy unreadable', () => {
     const explanation = explainAgentStateRules('claude', {})
-    expect(explanation.rules).toEqual([
+    expect(explanation.evaluated).toEqual([
       {
         ruleId: 'idle_title',
         region: 'title',
