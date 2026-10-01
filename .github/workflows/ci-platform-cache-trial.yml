@@ -105,7 +105,11 @@ jobs:
         if: always()
         with:
           name: pnpm-record-trial-${{ matrix.os }}
-          path: ${{ runner.temp }}/pnpm-verification-trial
+          path: |
+            ${{ runner.temp }}/pnpm-verification-trial/*.json
+            ${{ runner.temp }}/pnpm-verification-trial/*.jsonl
+            ${{ runner.temp }}/pnpm-verification-trial/*.log
+            ${{ runner.temp }}/pnpm-verification-trial/controls/
           retention-days: 7
           if-no-files-found: error
 
