@@ -13,7 +13,7 @@ type WorktreeRow = { id: string; hostId?: string }
 const mocks = vi.hoisted(() => {
   const repos: RepoRow[] = []
   const worktreesByRepo: Record<string, WorktreeRow[]> = {}
-  return { supports: vi.fn(), rpc: vi.fn(), repos, worktreesByRepo }
+  return { supports: vi.fn(), rpc: vi.fn(), repos, worktreesByRepo, environmentId: 'remote-test' }
 })
 vi.mock('@/store', () => ({
   useAppStore: {
@@ -21,7 +21,7 @@ vi.mock('@/store', () => ({
   }
 }))
 vi.mock('./runtime-rpc-client', () => ({
-  getActiveRuntimeTarget: () => ({ kind: 'environment', environmentId: 'remote-test' }),
+  getActiveRuntimeTarget: () => ({ kind: 'environment', environmentId: mocks.environmentId }),
   runtimeEnvironmentSupportsCapability: mocks.supports,
   callRuntimeRpc: mocks.rpc
 }))
@@ -30,6 +30,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.repos = []
   mocks.worktreesByRepo = {}
+  mocks.environmentId = 'remote-test'
   mocks.supports.mockResolvedValue(false)
   mocks.rpc.mockResolvedValue({ success: true })
 })
@@ -159,6 +160,20 @@ for (const operation of ['commitMessage', 'pullRequest'] as const) {
     it("reads the repository row for the worktree's own host", async () => {
       mocks.worktreesByRepo = { 'wt-1': [{ id: 'wt-1', hostId: 'ssh:runtime-box' }] }
       mocks.repos = [repoWithCodexModel('ssh:runtime-box')]
+      expect(await generate('default', false)).toMatchObject({ success: true })
+      expect(mocks.rpc).toHaveBeenCalledTimes(1)
+    })
+
+    it("does not borrow the runtime host's row for a worktree on another host", async () => {
+      mocks.worktreesByRepo = { 'wt-1': [{ id: 'wt-1', hostId: 'ssh:runtime-box' }] }
+      mocks.repos = [repoWithCodexModel('runtime:remote-test')]
+      expect(await generate('default', false)).toMatchObject({ success: false })
+      expect(mocks.rpc).not.toHaveBeenCalled()
+    })
+
+    it('matches the runtime host id in its encoded form', async () => {
+      mocks.environmentId = 'remote box'
+      mocks.repos = [repoWithCodexModel('runtime:remote%20box')]
       expect(await generate('default', false)).toMatchObject({ success: true })
       expect(mocks.rpc).toHaveBeenCalledTimes(1)
     })

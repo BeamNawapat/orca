@@ -117,17 +117,9 @@ async function findRepoForWorktree(worktreeId: string | null | undefined, enviro
   const worktree = findWorktreeById(state.worktreesByRepo, worktreeId)
   const runtimeHostId = toRuntimeExecutionHostId(environmentId)
   // Why: the server applies the repo row for the worktree's own host. Repo ids can repeat across
-  // hosts, so only rows on this worktree's host or the target runtime count; with no such row the
-  // gate uses no repo override rather than another host's.
-  const hostIds = new Set([
-    worktree ? getWorktreeExecutionHostId(worktree, undefined, runtimeHostId) : runtimeHostId,
-    runtimeHostId
-  ])
-  for (const hostId of hostIds) {
-    const repo = findRepoForHost(state.repos, repoId, { hostId })
-    if (repo) {
-      return repo
-    }
-  }
-  return null
+  // hosts, so with no row on that host the gate uses no repo override rather than another host's.
+  const hostId = worktree
+    ? getWorktreeExecutionHostId(worktree, undefined, runtimeHostId)
+    : runtimeHostId
+  return findRepoForHost(state.repos, repoId, { hostId })
 }
