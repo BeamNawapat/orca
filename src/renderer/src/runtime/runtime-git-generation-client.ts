@@ -1,5 +1,5 @@
 import { getRepoIdFromWorktreeId } from '../../../shared/worktree/id'
-import { antigravityGenerationCompatibilityError } from './antigravity-generation-compatibility'
+import { configuredModelGenerationCompatibilityError } from './configured-model-generation-compatibility'
 import {
   getRuntimeCommitMessageSettings,
   resolveLocalWorktreePath,
@@ -33,7 +33,7 @@ export async function generateRuntimeCommitMessage(
       ...(overrides?.agentCmdOverrides ? { agentCmdOverrides: overrides.agentCmdOverrides } : {})
     }) as Promise<RuntimeGenerateCommitMessageResult>
   }
-  const compatibilityError = await antigravityGenerationCompatibilityError(
+  const compatibilityError = await configuredModelGenerationCompatibilityError(
     target.environmentId,
     context,
     'commitMessage',
@@ -124,7 +124,7 @@ export async function generateRuntimePullRequestFields(
       ...(overrides?.agentCmdOverrides ? { agentCmdOverrides: overrides.agentCmdOverrides } : {})
     }) as Promise<RuntimeGeneratePullRequestFieldsResult>
   }
-  const compatibilityError = await antigravityGenerationCompatibilityError(
+  const compatibilityError = await configuredModelGenerationCompatibilityError(
     target.environmentId,
     context,
     'pullRequest',

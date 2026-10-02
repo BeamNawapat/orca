@@ -387,7 +387,7 @@ describe('discoverCommitMessageModelsLocal', () => {
         Buffer.from(JSON.stringify({ models: [{ slug: 'gpt-5.5', display_name: 'GPT-5.5' }] }))
       )
       secondChild.emit('close', 0)
-      await expect(second).resolves.toMatchObject({ success: true, defaultModelId: 'gpt-5.5' })
+      await expect(second).resolves.toMatchObject({ success: true, defaultModelId: 'default' })
     } finally {
       vi.useRealTimers()
     }
@@ -419,7 +419,7 @@ describe('discoverCommitMessageModelsLocal', () => {
         Buffer.from(JSON.stringify({ models: [{ slug: 'gpt-5.5', display_name: 'GPT-5.5' }] }))
       )
       secondChild.emit('close', 0)
-      await expect(second).resolves.toMatchObject({ success: true, defaultModelId: 'gpt-5.5' })
+      await expect(second).resolves.toMatchObject({ success: true, defaultModelId: 'default' })
     } finally {
       vi.useRealTimers()
     }

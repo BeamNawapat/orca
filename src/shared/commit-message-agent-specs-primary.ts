@@ -94,8 +94,7 @@ export function buildPrimaryCommitMessageAgentSpecs({
         '--skip-git-repo-check',
         '-s',
         'read-only',
-        '--model',
-        model,
+        ...(model && model !== 'default' ? ['--model', model] : []),
         ...(thinkingLevel ? ['-c', `model_reasoning_effort=${thinkingLevel}`] : [])
       ],
       // `-c` is intentionally absent: Codex accepts repeated overrides.
@@ -109,6 +108,13 @@ export function buildPrimaryCommitMessageAgentSpecs({
       // Why: ordered to match the official `codex` model picker — descending
       // by version so the frontier model lands on top and legacy models trail.
       models: [
+        {
+          // Why: Codex retires model slugs on its own schedule (gpt-5.5 retires
+          // 2026-10-14). Omitting --model lets `codex exec` use the model from the
+          // user's Codex config or Codex's own current default.
+          id: 'default',
+          label: 'Config default'
+        },
         {
           id: 'gpt-5.5',
           label: 'GPT-5.5',
@@ -150,7 +156,7 @@ export function buildPrimaryCommitMessageAgentSpecs({
           defaultThinkingLevel: 'low'
         }
       ],
-      defaultModelId: 'gpt-5.5'
+      defaultModelId: 'default'
     },
     opencode: {
       id: 'opencode',
