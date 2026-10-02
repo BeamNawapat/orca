@@ -10,6 +10,7 @@ import {
 import { shouldDeferActivationTerminalPrep } from './activation-terminal-prep'
 import { deriveActiveSurfaceForWorktree } from '../../tabs/tabs-surface'
 import { clearWorktreeSleepIntent } from '@/lib/worktree-sleep-intent'
+import { hasUnreadSiblingTerminalTab } from './worktree-unread-siblings'
 
 export function createSetActiveFolderWorkspace(
   set: WorktreeSliceSet,
@@ -29,12 +30,15 @@ export function createSetActiveFolderWorkspace(
     }
     const reconciledActiveTabId =
       get().reconcileWorktreeTabModel(workspaceKey).activeRenderableTabId
+    let shouldClearUnread = false
     set((s) => {
       const { activeFileId, activeBrowserTabId, activeTabType, activeTabId } =
         deriveActiveSurfaceForWorktree(s, workspaceKey, undefined, {
           legacySelection: 'remembered-type',
           preferredTabId: reconciledActiveTabId ?? undefined
         })
+      shouldClearUnread =
+        Boolean(workspace.isUnread) && !hasUnreadSiblingTerminalTab(s, workspaceKey, activeTabId)
       const nextEverActivated = s.everActivatedWorktreeIds.has(workspaceKey)
         ? s.everActivatedWorktreeIds
         : new Set([...s.everActivatedWorktreeIds, workspaceKey])
@@ -53,7 +57,7 @@ export function createSetActiveFolderWorkspace(
             : { ...s.activeTabTypeByWorktree, [workspaceKey]: activeTabType },
         activeTabId,
         everActivatedWorktreeIds: nextEverActivated,
-        folderWorkspaces: workspace.isUnread
+        folderWorkspaces: shouldClearUnread
           ? s.folderWorkspaces.map((entry) =>
               entry.id === folderWorkspaceId &&
               (!executionHostId || folderWorkspaceMatchesHost(entry, executionHostId))
@@ -65,7 +69,7 @@ export function createSetActiveFolderWorkspace(
     })
     // Why: cleared after the set() so a waiting pane connects against the activated state.
     clearWorktreeSleepIntent(workspaceKey)
-    if (workspace.isUnread) {
+    if (shouldClearUnread) {
       void get().updateFolderWorkspace(
         folderWorkspaceId,
         { isUnread: false },

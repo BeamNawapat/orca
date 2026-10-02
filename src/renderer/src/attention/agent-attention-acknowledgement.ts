@@ -157,11 +157,12 @@ export function applyAgentAttentionAcknowledgement(
   if (args.subjectKeys.length > 0) {
     sink.acknowledgeSubjects(args.subjectKeys)
   }
+  // Why: group first, since the workspace clear keeps the dot while any tab is still unread.
+  sink.clearGroupUnread(args.viewedGroupId)
   if (args.workspaceIdToClear !== null) {
     // Why: the selected agent is now visible, so drop the Dock-driving workspace unread.
     sink.clearWorkspaceUnread(args.workspaceIdToClear)
   }
-  sink.clearGroupUnread(args.viewedGroupId)
   for (const subjectKey of subjectKeysToClear) {
     sink.clearSubjectUnread(subjectKey)
   }

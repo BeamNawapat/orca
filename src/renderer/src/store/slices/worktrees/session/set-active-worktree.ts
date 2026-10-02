@@ -24,6 +24,7 @@ import {
 } from '../listing/detected-worktree-meta'
 import { persistPassiveWorktreeMetaForOwner } from '../listing/worktree-owner-settings'
 import { resolveActivatedWorktreeSurface } from './active-worktree-surface'
+import { hasUnreadSiblingTerminalTab } from './worktree-unread-siblings'
 import { clearWorktreeSleepIntent } from '@/lib/worktree-sleep-intent'
 import {
   pendingActivationTerminalPrepCancels,
@@ -80,7 +81,6 @@ export function createSetActiveWorktree(
       }
 
       const worktree = findKnownWorktreeById(s, worktreeId, executionHostId)
-      shouldClearUnread = Boolean(worktree?.isUnread)
       const {
         restoredRightSidebarExplorerView,
         activeFileId,
@@ -93,6 +93,8 @@ export function createSetActiveWorktree(
         stateTransition?.preferredActiveUnifiedTabId,
         reconciledActiveTabId
       )
+      shouldClearUnread =
+        Boolean(worktree?.isUnread) && !hasUnreadSiblingTerminalTab(s, worktreeId, activeTabId)
 
       // Why: focus isn't smart-sort activity — writing lastActivityAt here caused the "jump after focus" bug; only clear unread.
       const metaUpdates: Partial<WorktreeMeta> = shouldClearUnread ? { isUnread: false } : {}
