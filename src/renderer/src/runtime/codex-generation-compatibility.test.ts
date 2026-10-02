@@ -1,12 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../../shared/constants'
 import { CODEX_CONFIGURED_MODEL_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
+import { getRuntimeCommitMessageSettings } from './runtime-git-client-context'
 import {
   generateRuntimeCommitMessage,
   generateRuntimePullRequestFields
 } from './runtime-git-generation-client'
 
-const mocks = vi.hoisted(() => ({ supports: vi.fn(), rpc: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  supports: vi.fn(),
+  rpc: vi.fn(),
+  repos: [] as { id: string; sourceControlAi?: unknown }[]
+}))
+vi.mock('@/store', () => ({ useAppStore: { getState: () => ({ repos: mocks.repos }) } }))
 vi.mock('./runtime-rpc-client', () => ({
   getActiveRuntimeTarget: () => ({ kind: 'environment', environmentId: 'remote-test' }),
   runtimeEnvironmentSupportsCapability: mocks.supports,
@@ -15,16 +21,22 @@ vi.mock('./runtime-rpc-client', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.repos = []
   mocks.supports.mockResolvedValue(false)
   mocks.rpc.mockResolvedValue({ success: true })
 })
 
 for (const operation of ['commitMessage', 'pullRequest'] as const) {
   describe(operation, () => {
-    function generate(model: string, resolved = true, agentArgs?: string) {
+    function remoteSettings() {
       const settings = getDefaultSettings('/tmp')
       settings.activeRuntimeEnvironmentId = 'remote-test'
       settings.sourceControlAi = { ...settings.sourceControlAi!, agentId: 'codex' }
+      return settings
+    }
+
+    function generate(model: string, resolved = true, agentArgs?: string) {
+      const settings = remoteSettings()
       const context = { settings, worktreeId: 'wt-1', worktreePath: '/remote/workspace' }
       const overrides = resolved
         ? {
@@ -75,6 +87,30 @@ for (const operation of ['commitMessage', 'pullRequest'] as const) {
 
     it('accepts an explicit model supplied through the recipe CLI arguments', async () => {
       expect(await generate('default', true, '--model gpt-5.4')).toMatchObject({ success: true })
+      expect(mocks.supports).not.toHaveBeenCalled()
+      expect(mocks.rpc).toHaveBeenCalledTimes(1)
+    })
+
+    it('accepts the -m short form of an explicit recipe model', async () => {
+      expect(await generate('default', true, '-m gpt-5.4')).toMatchObject({ success: true })
+      expect(mocks.supports).not.toHaveBeenCalled()
+      expect(mocks.rpc).toHaveBeenCalledTimes(1)
+    })
+
+    it("honors the repository's explicit model override for settings-derived params", async () => {
+      const hostKey =
+        getRuntimeCommitMessageSettings(remoteSettings()).commitMessageDiscoveryHostKey!
+      mocks.repos = [
+        {
+          id: 'wt-1',
+          sourceControlAi: {
+            modelOverridesByOperation: {
+              [operation]: { selectedModelByAgentByHost: { [hostKey]: { codex: 'gpt-5.4' } } }
+            }
+          }
+        }
+      ]
+      expect(await generate('default', false)).toMatchObject({ success: true })
       expect(mocks.supports).not.toHaveBeenCalled()
       expect(mocks.rpc).toHaveBeenCalledTimes(1)
     })

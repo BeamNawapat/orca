@@ -113,7 +113,11 @@ export function buildPrimaryCommitMessageAgentSpecs({
           // 2026-10-14). Omitting --model lets `codex exec` use the model from the
           // user's Codex config or Codex's own current default.
           id: 'default',
-          label: 'Config default'
+          label: 'Config default',
+          // Why: keep the low effort the pinned default used, so generation cost and
+          // latency don't change for users whose Codex config sets a higher effort.
+          thinkingLevels: OPENAI_THINKING_LEVELS,
+          defaultThinkingLevel: 'low'
         },
         {
           id: 'gpt-5.5',
