@@ -583,15 +583,9 @@ describe('isMuseReadyPromptPreview', () => {
     ).toBe(false)
   })
 
-  it('recognizes a footer-free composer painted with cursor moves and escapes', () => {
-    const esc = String.fromCharCode(27)
-    const bel = String.fromCharCode(7)
-    const rule = '─'.repeat(40)
-    const painted =
-      `${esc}[2;3H${esc}[1mMuse Code${esc}[22m 1.4.2${esc}[4;1H${esc}[2m${rule}` +
-      `${esc}]0;app${bel}${esc}7${esc}[>3u${esc}(B${esc}[5;1H${esc}[22m❯${esc}8` +
-      `${esc}[6;1H${esc}[2m${rule}${esc}[7;3H${esc}[22mmuse-spark-1.4 · max · ~/work/app`
-    expect(isMuseReadyPromptPreview(waitTextFor([painted]))).toBe(true)
+  it('refuses a shell prompt below the stale footer-free composer of an exited Muse', () => {
+    const waitText = waitTextFor([...MUSE_READY_SCREEN_NO_VOICE_FOOTER, '~/work/app ❯'])
+    expect(isMuseReadyPromptPreview(waitText)).toBe(false)
   })
 
   it('refuses a footer-free composer once a blocked dialog opens below it', () => {
