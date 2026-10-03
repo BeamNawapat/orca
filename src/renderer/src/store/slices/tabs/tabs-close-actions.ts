@@ -86,6 +86,7 @@ export function createTabsCloseActions(
         remainingOrder
       )
       const terminalEntityId = tab.contentType === 'terminal' ? tab.entityId : null
+      let closedUnreadTerminal = false
 
       set((current) => {
         const nextTabs = (current.unifiedTabsByWorktree[worktreeId] ?? []).filter(
@@ -96,6 +97,7 @@ export function createTabsCloseActions(
         if (terminalEntityId && current.unreadTerminalTabs[terminalEntityId]) {
           nextUnreadTerminalTabs = { ...current.unreadTerminalTabs }
           delete nextUnreadTerminalTabs[terminalEntityId]
+          closedUnreadTerminal = true
         }
         let nextGroups = (current.groupsByWorktree[worktreeId] ?? []).map((candidate) =>
           candidate.id === group.id
@@ -192,6 +194,10 @@ export function createTabsCloseActions(
         }
       })
 
+      // Why: close-to-right/others skip terminals.closeTab, so release a dot held for this tab's bell here too (#24879).
+      if (closedUnreadTerminal && get().activeWorktreeId === worktreeId) {
+        get().clearWorktreeUnread(worktreeId)
+      }
       if (opts?.recordInteraction !== false) {
         get().recordFeatureInteraction?.('terminal-tabs')
       }

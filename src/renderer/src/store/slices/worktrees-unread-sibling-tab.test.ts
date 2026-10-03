@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createTestStore,
+  makeOpenFile,
   makeTab,
   makeTabGroup,
   makeUnifiedTab,
@@ -119,5 +120,72 @@ describe('workspace unread with a sibling tab still unread', () => {
 
     expect(store.getState().activeTabId).toBe(tab2.id)
     expect(store.getState().worktreesByRepo.repo1[0].isUnread).toBe(false)
+  })
+
+  it('clears the dot when the waiting tab is closed', () => {
+    const store = seed(tab1.id)
+    store.getState().setActiveWorktree(wt.id)
+
+    store.getState().closeTab(tab2.id)
+
+    expect(store.getState().unreadTerminalTabs[tab2.id]).toBeUndefined()
+    expect(store.getState().worktreesByRepo.repo1[0].isUnread).toBe(false)
+  })
+
+  it('clears the dot when close-others removes the waiting tab', () => {
+    const store = seed(tab1.id)
+    store.getState().setActiveWorktree(wt.id)
+
+    store.getState().closeUnifiedTab(tab2.id)
+
+    expect(store.getState().unreadTerminalTabs[tab2.id]).toBeUndefined()
+    expect(store.getState().worktreesByRepo.repo1[0].isUnread).toBe(false)
+  })
+
+  it('keeps the dot when closing the waiting tab of a workspace in the background', () => {
+    const store = seed(tab1.id)
+
+    store.getState().closeTab(tab2.id)
+
+    expect(store.getState().worktreesByRepo.repo1[0].isUnread).toBe(true)
+  })
+
+  it('keeps the dot when activation shows an editor over the waiting terminal', () => {
+    const store = seed(tab2.id)
+    const filePath = '/path/wt1/a.ts'
+    store.setState((state) => ({
+      openFiles: [makeOpenFile({ id: filePath, worktreeId: wt.id })],
+      unifiedTabsByWorktree: {
+        [wt.id]: [
+          ...state.unifiedTabsByWorktree[wt.id],
+          makeUnifiedTab({
+            id: 'file-tab',
+            entityId: filePath,
+            contentType: 'editor',
+            worktreeId: wt.id,
+            groupId: 'group-1'
+          })
+        ]
+      },
+      groupsByWorktree: {
+        [wt.id]: [
+          makeTabGroup({
+            id: 'group-1',
+            worktreeId: wt.id,
+            activeTabId: 'file-tab',
+            tabOrder: [tab1.id, tab2.id, 'file-tab']
+          })
+        ]
+      },
+      activeTabIdByWorktree: { [wt.id]: tab2.id },
+      activeFileIdByWorktree: { [wt.id]: filePath },
+      activeTabTypeByWorktree: { [wt.id]: 'editor' }
+    }))
+
+    store.getState().setActiveWorktree(wt.id)
+
+    expect(store.getState().activeTabType).toBe('editor')
+    expect(store.getState().activeTabId).toBe(tab2.id)
+    expect(store.getState().worktreesByRepo.repo1[0].isUnread).toBe(true)
   })
 })

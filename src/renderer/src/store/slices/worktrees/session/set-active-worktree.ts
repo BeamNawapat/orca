@@ -93,8 +93,14 @@ export function createSetActiveWorktree(
         stateTransition?.preferredActiveUnifiedTabId,
         reconciledActiveTabId
       )
+      // Why: activeTabId keeps the last terminal while an editor or browser tab is shown, and that hidden terminal's bell is unseen.
       shouldClearUnread =
-        Boolean(worktree?.isUnread) && !hasUnreadSiblingTerminalTab(s, worktreeId, activeTabId)
+        Boolean(worktree?.isUnread) &&
+        !hasUnreadSiblingTerminalTab(
+          s,
+          worktreeId,
+          activeTabType === 'terminal' ? activeTabId : null
+        )
 
       // Why: focus isn't smart-sort activity — writing lastActivityAt here caused the "jump after focus" bug; only clear unread.
       const metaUpdates: Partial<WorktreeMeta> = shouldClearUnread ? { isUnread: false } : {}

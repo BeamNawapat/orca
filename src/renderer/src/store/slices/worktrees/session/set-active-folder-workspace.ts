@@ -37,8 +37,14 @@ export function createSetActiveFolderWorkspace(
           legacySelection: 'remembered-type',
           preferredTabId: reconciledActiveTabId ?? undefined
         })
+      // Why: a terminal behind a shown editor or browser tab has not been seen.
       shouldClearUnread =
-        Boolean(workspace.isUnread) && !hasUnreadSiblingTerminalTab(s, workspaceKey, activeTabId)
+        Boolean(workspace.isUnread) &&
+        !hasUnreadSiblingTerminalTab(
+          s,
+          workspaceKey,
+          activeTabType === 'terminal' ? activeTabId : null
+        )
       const nextEverActivated = s.everActivatedWorktreeIds.has(workspaceKey)
         ? s.everActivatedWorktreeIds
         : new Set([...s.everActivatedWorktreeIds, workspaceKey])

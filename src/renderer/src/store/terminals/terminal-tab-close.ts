@@ -44,6 +44,7 @@ export function createTerminalTabCloseActions(
           tabId
         })
       }
+      let closedUnreadTab = false
       set((s) => {
         // Why hoisted: omitRecordKeys takes an iterable, and this closes over one
         // array instead of allocating a fresh [tabId] at each of the call sites below.
@@ -118,6 +119,7 @@ export function createTerminalTabCloseActions(
         ])
         // Why: keep the same reference when the closing tab had no unread flag, so unrelated closes don't force full-state selector re-eval.
         const nextUnreadTerminalTabs = omitByTabId(s.unreadTerminalTabs)
+        closedUnreadTab = nextUnreadTerminalTabs !== s.unreadTerminalTabs
         const nextUnreadTerminalPanes = removePaneKeysByTabPrefix(s.unreadTerminalPanes, tabId)
         const nextUnreadAgentCompletionPanes = removePaneKeysByTabPrefix(
           s.unreadAgentCompletionPanes,
@@ -252,6 +254,10 @@ export function createTerminalTabCloseActions(
       }
       // Why shared with the paired snapshot apply: every path that removes a tab owes it the same sweep, and a second copy of the list is how one path silently misses a new entry.
       sweepRetiredTerminalTabState(get(), tabId, closingWorktreeId)
+      // Why: the workspace dot may have been held only for this tab's bell (#24879).
+      if (closedUnreadTab && closingWorktreeId && get().activeWorktreeId === closingWorktreeId) {
+        get().clearWorktreeUnread(closingWorktreeId)
+      }
       for (const tabs of Object.values(get().unifiedTabsByWorktree)) {
         const workspaceItem = tabs.find(
           (entry) => entry.contentType === 'terminal' && entry.entityId === tabId
