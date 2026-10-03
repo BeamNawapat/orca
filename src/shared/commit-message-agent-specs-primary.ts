@@ -94,7 +94,8 @@ export function buildPrimaryCommitMessageAgentSpecs({
         '--skip-git-repo-check',
         '-s',
         'read-only',
-        ...(model && model !== 'default' ? ['--model', model] : []),
+        '--model',
+        model,
         ...(thinkingLevel ? ['-c', `model_reasoning_effort=${thinkingLevel}`] : [])
       ],
       // `-c` is intentionally absent: Codex accepts repeated overrides.
@@ -109,13 +110,8 @@ export function buildPrimaryCommitMessageAgentSpecs({
       // by version so the frontier model lands on top and legacy models trail.
       models: [
         {
-          // Why: Codex retires model slugs on its own schedule (gpt-5.5 retires
-          // 2026-10-14). Omitting --model lets `codex exec` use the model from the
-          // user's Codex config or Codex's own current default.
-          id: 'default',
-          label: 'Config default',
-          // Why: keep the low effort the pinned default used, so generation cost and
-          // latency don't change for users whose Codex config sets a higher effort.
+          id: 'gpt-5.6-terra',
+          label: 'GPT-5.6 Terra',
           thinkingLevels: OPENAI_THINKING_LEVELS,
           defaultThinkingLevel: 'low'
         },
@@ -160,7 +156,7 @@ export function buildPrimaryCommitMessageAgentSpecs({
           defaultThinkingLevel: 'low'
         }
       ],
-      defaultModelId: 'default'
+      defaultModelId: 'gpt-5.6-terra'
     },
     opencode: {
       id: 'opencode',

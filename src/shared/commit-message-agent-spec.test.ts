@@ -44,10 +44,10 @@ describe('COMMIT_MESSAGE_AGENT_SPECS', () => {
     ])
   })
 
-  it('uses the strongest available defaults for core agents', () => {
+  it('uses the expected defaults for core agents', () => {
     expect(COMMIT_MESSAGE_AGENT_SPECS.claude?.defaultModelId).toBe('sonnet')
-    // Why: a pinned Codex slug breaks generation when Codex retires it (gpt-5.5 on 2026-10-14).
-    expect(COMMIT_MESSAGE_AGENT_SPECS.codex?.defaultModelId).toBe('default')
+    expect(COMMIT_MESSAGE_AGENT_SPECS.codex?.defaultModelId).toBe('gpt-5.6-terra')
+    expect(getCommitMessageModel('codex', 'gpt-5.6-terra')?.defaultThinkingLevel).toBe('low')
     expect(COMMIT_MESSAGE_AGENT_SPECS.pi?.defaultModelId).toBe('default')
   })
 
@@ -186,10 +186,10 @@ describe('COMMIT_MESSAGE_AGENT_SPECS', () => {
     expect(listCommitMessageAgentIds()).not.toContain(CUSTOM_AGENT_ID)
   })
 
-  it('lists Config default first, then Codex models by version descending', () => {
+  it('orders Codex models by version descending to match the official picker', () => {
     const ids = COMMIT_MESSAGE_AGENT_SPECS.codex?.models.map((m) => m.id)
     expect(ids).toEqual([
-      'default',
+      'gpt-5.6-terra',
       'gpt-5.5',
       'gpt-5.4',
       'gpt-5.4-mini',
@@ -207,7 +207,7 @@ describe('COMMIT_MESSAGE_AGENT_SPECS', () => {
       id: 'codex',
       label: 'Codex',
       modelSource: 'dynamic',
-      defaultModelId: 'default'
+      defaultModelId: 'gpt-5.6-terra'
     })
     expect(codex).not.toHaveProperty('binary')
     expect(codex).not.toHaveProperty('buildArgs')
@@ -532,11 +532,6 @@ describe('buildArgs (Codex)', () => {
   it('omits the -c flag when no thinking level is supplied', () => {
     const args = spec.buildArgs({ prompt: 'PROMPT', model: 'gpt-5.4-mini' })
     expect(args).not.toContain('-c')
-  })
-
-  it('omits --model for Config default so Codex uses its configured model', () => {
-    const args = spec.buildArgs({ prompt: 'PROMPT', model: 'default' })
-    expect(args).toEqual(['exec', '--ephemeral', '--skip-git-repo-check', '-s', 'read-only'])
   })
 })
 

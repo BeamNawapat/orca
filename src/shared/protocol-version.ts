@@ -1,7 +1,6 @@
 import { AGENT_SESSION_BACKGROUND_TASK_CHILD_VIEWS_CAPABILITY } from './agent-session-background-task-child-views-capability'
 import { AGENT_SESSION_STOP_RUNTIME_CAPABILITIES } from './agent-session-stop-capabilities'
 import { REMOTE_SERVER_UPDATE_CAPABILITY } from './remote-server-update'
-import { SOURCE_CONTROL_CONFIGURED_MODEL_RUNTIME_CAPABILITIES } from './source-control-configured-model-capabilities'
 import {
   SKILL_BUNDLE_INSTALL_CAPABILITY,
   SKILL_DELETE_CAPABILITY,
@@ -155,7 +154,6 @@ export const AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY =
   'agent-session.session-boundary.v1' as const
 export { REMOTE_SERVER_UPDATE_CAPABILITY } from './remote-server-update'
 export * from './agent-session-stop-capabilities'
-export * from './source-control-configured-model-capabilities'
 export const AGENT_SESSION_HOST_AUTHORITY_RUNTIME_CAPABILITY =
   'agent-session.host-authority.v1' as const
 // Older launch schemas reject unknown fields; advertise before clients send keyboard support.
@@ -332,6 +330,9 @@ export const NATIVE_REMOTE_RUNTIME_CLIENT_CAPABILITIES = [
   AGENT_LAUNCH_RUNTIME_CAPABILITY
 ] as const
 
+export const ANTIGRAVITY_CONFIGURED_MODEL_RUNTIME_CAPABILITY =
+  'git.antigravity-configured-model.v1' as const
+
 // Why: `agentSession.create` is a strict object, so an older host refuses a payload carrying the
 // reserved `tabId` rather than ignoring it. A client sends the field only to a host advertising this.
 export const AGENT_SESSION_CREATE_TAB_ID_RUNTIME_CAPABILITY =
@@ -340,7 +341,7 @@ export const AGENT_SESSION_CREATE_TAB_ID_RUNTIME_CAPABILITY =
 export const RUNTIME_CAPABILITIES = [
   ...AGENT_SESSION_STOP_RUNTIME_CAPABILITIES,
   AGENT_SESSION_CREATE_TAB_ID_RUNTIME_CAPABILITY,
-  ...SOURCE_CONTROL_CONFIGURED_MODEL_RUNTIME_CAPABILITIES,
+  ANTIGRAVITY_CONFIGURED_MODEL_RUNTIME_CAPABILITY,
   'files.pathsExist',
   'runtime.status.compat.v1',
   'runtime.environments.v1',
