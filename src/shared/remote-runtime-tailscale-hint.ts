@@ -14,6 +14,10 @@ const TAILSCALE_DOWNLOAD_URL = 'https://tailscale.com/download'
 const REMOTE_RUNTIME_UNREACHABLE_RE =
   /could not connect to the remote orca runtime|remote orca runtime closed the connection|timed out (?:waiting for|while connecting to) the remote orca runtime/i
 
+// Why: the host answered and failed certificate checks, so a network remedy would mislead.
+// Mirrors REMOTE_RUNTIME_TLS_REJECTED_PHRASE in remote-runtime-connect-bound.ts.
+const TLS_REJECTED_RE = /TLS certificate was rejected/
+
 const TAILSCALE_MAGIC_DNS_SUFFIX_RE = /(?:^|\.)ts\.net$/i
 // Why: gate the CGNAT check on a full IPv4 literal — the range regex alone also
 // matches DNS names like `100.64.0.1.example.com`, which aren't Tailscale IPs.
@@ -71,7 +75,7 @@ export function withRemoteRuntimeTailscaleHint(
   message: string,
   endpoint: string | null | undefined
 ): string {
-  if (!REMOTE_RUNTIME_UNREACHABLE_RE.test(message)) {
+  if (!REMOTE_RUNTIME_UNREACHABLE_RE.test(message) || TLS_REJECTED_RE.test(message)) {
     return message
   }
   // Why: keep the hint idempotent so a message routed through this helper twice (e.g. a
