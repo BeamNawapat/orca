@@ -33,7 +33,11 @@ function makeStore() {
   }
 }
 
-function syncGraph(runtime: OrcaRuntimeService, tabTitle: string): void {
+function syncGraph(
+  runtime: OrcaRuntimeService,
+  tabTitle: string,
+  paneTitle = 'probe-worktree'
+): void {
   runtime.syncWindowGraph(1, {
     tabs: [
       {
@@ -52,7 +56,7 @@ function syncGraph(runtime: OrcaRuntimeService, tabTitle: string): void {
         paneRuntimeId: 1,
         ptyId: PTY_ID,
         // The pane's own title from before the rename; an idle pane never replaces it.
-        paneTitle: 'probe-worktree',
+        paneTitle,
         title: tabTitle
       }
     ]
@@ -119,5 +123,17 @@ describe('terminal list title after renaming an idle terminal', () => {
 
     const after = await runtime.listTerminals(`id:${WORKTREE_ID}`)
     expect(after.terminals[0].title).toBe('probe-worktree')
+  })
+
+  // Why: renameTerminal documents that a manual rename outranks later agent title updates.
+  it('keeps the new title when the pane reports a new title after the rename', async () => {
+    const { runtime } = makeRuntime()
+    const before = await runtime.listTerminals(`id:${WORKTREE_ID}`)
+
+    await runtime.renameTerminal(before.terminals[0].handle, 'My Label')
+    syncGraph(runtime, 'My Label', 'codex: working')
+
+    const after = await runtime.listTerminals(`id:${WORKTREE_ID}`)
+    expect(after.terminals[0].title).toBe('My Label')
   })
 })
