@@ -64,8 +64,10 @@ function syncGraph(
 }
 
 function makeRuntime(): { runtime: OrcaRuntimeService; renameTerminal: ReturnType<typeof vi.fn> } {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: test-only store stub; makeStore covers the reads this suite drives.
   const runtime = new OrcaRuntimeService(makeStore() as never)
   const renameTerminal = vi.fn()
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: test-only controller stub; only listProcesses is exercised.
   runtime.setPtyController({
     spawn: vi.fn(async () => ({ id: 'never' })),
     write: () => true,
