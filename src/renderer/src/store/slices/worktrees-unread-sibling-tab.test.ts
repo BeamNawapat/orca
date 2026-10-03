@@ -79,6 +79,29 @@ describe('workspace unread with a sibling tab still unread', () => {
     )
   })
 
+  it('clears the dot when the waiting tab is picked from the tab strip', () => {
+    const store = seed(tab1.id)
+    store.getState().setActiveWorktree(wt.id)
+
+    store.getState().activateTab(tab2.id)
+
+    expect(store.getState().unreadTerminalTabs[tab2.id]).toBeUndefined()
+    expect(store.getState().worktreesByRepo.repo1[0].isUnread).toBe(false)
+  })
+
+  it('keeps the dot when a tab strip pick leaves another tab waiting', () => {
+    const store = seed(tab1.id)
+    store.setState({
+      unreadTerminalTabs: { [tab1.id]: 'terminal-bell', [tab2.id]: 'terminal-bell' }
+    })
+    store.getState().setActiveWorktree(wt.id)
+
+    store.getState().activateTab(tab2.id)
+
+    expect(store.getState().unreadTerminalTabs[tab1.id]).toBe('terminal-bell')
+    expect(store.getState().worktreesByRepo.repo1[0].isUnread).toBe(true)
+  })
+
   it('keeps the dot when activating the workspace onto a different tab', () => {
     const store = seed(tab1.id)
 

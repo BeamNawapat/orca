@@ -40,6 +40,7 @@ export function createTabsFocusActions(
       ),
 
     activateTab: (tabId, opts) => {
+      let clearedBellWorktreeId: string | null = null
       set((state) => {
         const scopedWorktreeId = opts?.worktreeId
         let found: ReturnType<typeof findTabAndWorktree>
@@ -69,6 +70,9 @@ export function createTabsFocusActions(
                 return copy
               })()
             : state.unreadTerminalTabs
+        if (nextUnreadTerminalTabs !== state.unreadTerminalTabs) {
+          clearedBellWorktreeId = worktreeId
+        }
         return {
           unifiedTabsByWorktree: {
             ...state.unifiedTabsByWorktree,
@@ -108,6 +112,10 @@ export function createTabsFocusActions(
             : {})
         }
       })
+      // Why: the workspace dot was held for this bell (#24879); clear it once no other tab still waits.
+      if (clearedBellWorktreeId !== null) {
+        get().clearWorktreeUnread(clearedBellWorktreeId)
+      }
     }
   }
 }
