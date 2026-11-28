@@ -216,7 +216,8 @@ export class ClaudeChildWorkDecoder {
     }
     // Progress descriptions describe the current activity, not the task.
     const name = task.name ?? taskName(message)
-    this.upsert(id, { ...tf.claudeTaskSeenAgain(task), name }, claudeTaskProgressFacts(message))
+    const seen = tf.claudeTaskSeenAgain(task, message)
+    this.upsert(id, { ...seen, name }, claudeTaskProgressFacts(message, seen))
   }
 
   private updated(
@@ -328,7 +329,11 @@ export class ClaudeChildWorkDecoder {
       this.wake.fromEnding(reported.runId ?? task?.toolUseId, ownerOf, task?.parentTaskId)
     }
     this.pending.push((observedAt) =>
-      childWorkEndedEvidence(id, reported.runId, outcome, observedAt, reported)
+      childWorkEndedEvidence(id, reported.runId, outcome, observedAt, {
+        // A workflow's phase line is never its reason, so the message goes through the filter.
+        ...tf.claudeEndedMessage(task, reported.lastMessage),
+        ...(reported.totalTokens !== undefined ? { totalTokens: reported.totalTokens } : {})
+      })
     )
     // Its own foreground commands could not outlive it either.
     this.surfaceForegroundCommands(id, ownerOf)
